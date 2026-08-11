@@ -1,0 +1,22 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    Quit,
+    EnterInsert,
+    EnterCommand,
+    SendRequest,
+    ToggleFocus,
+    TreeDown,
+    TreeUp,
+    TreeCollapse,
+    TreeExpand,
+    TreeOpen,
+    AuthCycleKind,
+    AuthFieldDown,
+    AuthFieldUp,
+    AuthToggleLocation,
+    SearchStart,
+    SearchNext,
+    SearchPrev,
+    JumpTop,
+    JumpBottom,
+}
