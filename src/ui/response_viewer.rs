@@ -7,6 +7,7 @@ use tui_tree_widget::{Tree, TreeItem};
 
 use crate::app::App;
 use crate::mode::{Focus, SidebarView};
+use crate::ui::format::format_bytes;
 use crate::ui::theme;
 use crate::ui::widgets::{self, BodyView};
 
@@ -33,7 +34,13 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
         return;
     };
 
-    let header = format!("{} {}  ·  {:?}", response.status, response.status_text, response.elapsed);
+    let header = format!(
+        "{} {} · {} · {}ms",
+        response.status,
+        response.status_text,
+        format_bytes(response.byte_len),
+        response.elapsed.as_millis()
+    );
     let content_type = response
         .headers
         .iter()
@@ -58,7 +65,7 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
             render_message(
                 frame,
                 area,
-                format!("{header}\n\nBinary content, {} bytes", response.byte_len),
+                format!("{header}\n\nBinary content, {}", format_bytes(response.byte_len)),
                 border_style,
             );
         }

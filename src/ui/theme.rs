@@ -1,8 +1,8 @@
 use ratatui::style::{Color, Modifier, Style};
 
-pub const FOCUS_BORDER: Color = Color::Yellow;
+pub const FOCUS_BORDER: Color = Color::Green;
 pub const SELECTED_FG: Color = Color::Black;
-pub const SELECTED_BG: Color = Color::Yellow;
+pub const SELECTED_BG: Color = Color::Green;
 pub const MODE_INDICATOR_FG: Color = Color::Black;
 pub const MODE_INDICATOR_BG: Color = Color::Cyan;
 pub const ACCENT: Color = Color::Cyan;

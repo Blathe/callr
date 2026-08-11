@@ -1,4 +1,5 @@
 mod auth_editor;
+mod format;
 mod request_editor;
 mod response_viewer;
 mod sidebar;
@@ -146,6 +147,6 @@ mod tests {
 
         let text = render_to_string(&mut app);
         assert!(text.contains("Binary content"), "expected binary placeholder in output:\n{text}");
-        assert!(text.contains("4096"), "expected byte count in output:\n{text}");
+        assert!(text.contains("4.00 KB"), "expected formatted byte count in output:\n{text}");
     }
 }
