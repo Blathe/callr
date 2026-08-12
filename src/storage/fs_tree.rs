@@ -56,3 +56,8 @@ pub fn build_tree(root: &Path) -> io::Result<Vec<CollectionNode>> {
 pub fn create_collection(path: &Path) -> io::Result<()> {
     fs::create_dir_all(path)
 }
+
+/// Deletes a collection directory and everything inside it.
+pub fn delete_collection(path: &Path) -> io::Result<()> {
+    fs::remove_dir_all(path)
+}

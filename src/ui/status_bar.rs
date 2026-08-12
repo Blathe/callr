@@ -25,7 +25,7 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
             } else {
                 let hint = match app.focus {
                     crate::mode::Focus::Sidebar => {
-                        "  j/k: move  gg/G: top/bottom  h/l: collapse/expand  Enter: open  Tab/S-Tab: cycle pane  :history  :collections  :mkdir  q: quit"
+                        "  j/k: move  gg/G: top/bottom  h/l: collapse/expand  Enter: open  Tab/S-Tab: cycle pane  :history  :collections add/del  q: quit"
                     }
                     crate::mode::Focus::UrlBar => {
                         "  i: edit url  m: method  Enter: send  Tab/S-Tab: cycle pane  ':': command  q: quit"

@@ -228,18 +228,30 @@ impl App {
             "q" | "quit" => self.should_quit = true,
             "w" | "write" => self.save_current(),
             "new" => self.new_request(rest),
-            "mkdir" => self.new_collection(rest),
             "history" => self.show_history(),
             "find" => self.search_history(rest),
             "env" => {
                 self.status_message =
                     Some("Environment variables aren't in this release yet — planned for a future version".to_string())
             }
-            "collections" => {
-                self.sidebar_view = SidebarView::Collections;
-                self.focus = Focus::Sidebar;
-            }
+            "collections" => self.run_collections_command(rest),
             other => self.status_message = Some(format!("Unknown command: {other}")),
+        }
+    }
+
+    fn run_collections_command(&mut self, rest: &str) {
+        if rest.is_empty() {
+            self.sidebar_view = SidebarView::Collections;
+            self.focus = Focus::Sidebar;
+            return;
+        }
+        let mut parts = rest.splitn(2, ' ');
+        let sub = parts.next().unwrap_or("");
+        let name = parts.next().unwrap_or("").trim();
+        match sub {
+            "add" => self.new_collection(name),
+            "del" | "delete" => self.delete_collection(name),
+            other => self.status_message = Some(format!("Unknown :collections subcommand: {other}")),
         }
     }
 
@@ -561,7 +573,7 @@ impl App {
 
     fn new_collection(&mut self, name: &str) {
         if name.is_empty() {
-            self.status_message = Some("Usage: :mkdir <name>".to_string());
+            self.status_message = Some("Usage: :collections add <name>".to_string());
             return;
         }
         let dir = self.selected_dir();
@@ -576,6 +588,26 @@ impl App {
                 self.status_message = Some(format!("Created {}", path.display()));
             }
             Err(err) => self.status_message = Some(format!("Failed to create collection: {err}")),
+        }
+    }
+
+    fn delete_collection(&mut self, name: &str) {
+        if name.is_empty() {
+            self.status_message = Some("Usage: :collections del <name>".to_string());
+            return;
+        }
+        let dir = self.selected_dir();
+        let path = dir.join(slugify(name));
+        if !path.is_dir() {
+            self.status_message = Some(format!("{} is not a collection", path.display()));
+            return;
+        }
+        match storage::fs_tree::delete_collection(&path) {
+            Ok(()) => {
+                self.refresh_tree();
+                self.status_message = Some(format!("Deleted {}", path.display()));
+            }
+            Err(err) => self.status_message = Some(format!("Failed to delete collection: {err}")),
         }
     }
 
@@ -1058,7 +1090,23 @@ mod tests {
     }
 
     #[test]
-    fn handle_key_drives_method_cycle_body_edit_and_mkdir_end_to_end() {
+    fn delete_collection_removes_a_directory_and_refuses_missing_ones() {
+        let (mut app, dir) = test_app();
+
+        app.new_collection("My Folder");
+        let created = dir.path().join("my_folder");
+        assert!(created.is_dir());
+
+        app.delete_collection("nope");
+        assert!(app.status_message.as_deref().unwrap_or_default().contains("is not a collection"));
+
+        app.delete_collection("My Folder");
+        assert!(!created.exists());
+        assert!(app.status_message.as_deref().unwrap_or_default().contains("Deleted"));
+    }
+
+    #[test]
+    fn handle_key_drives_method_cycle_body_edit_and_collections_command_end_to_end() {
         let (mut app, dir) = test_app();
 
         // URL bar 'm' cycles the method through the real key-dispatch path.
@@ -1083,14 +1131,22 @@ mod tests {
         app.handle_key(KeyEvent::from(KeyCode::BackTab));
         assert_eq!(app.focus, Focus::Auth);
 
-        // `:mkdir demo` creates a real folder via the command pipeline.
+        // `:collections add demo` creates a real folder via the command pipeline.
         app.focus = Focus::Sidebar;
         app.handle_key(KeyEvent::from(KeyCode::Char(':')));
         assert_eq!(app.mode, Mode::Command);
-        for ch in "mkdir demo".chars() {
+        for ch in "collections add demo".chars() {
             app.handle_key(KeyEvent::from(KeyCode::Char(ch)));
         }
         app.handle_key(KeyEvent::from(KeyCode::Enter));
         assert!(dir.path().join("demo").is_dir());
+
+        // `:collections del demo` removes it again.
+        app.handle_key(KeyEvent::from(KeyCode::Char(':')));
+        for ch in "collections del demo".chars() {
+            app.handle_key(KeyEvent::from(KeyCode::Char(ch)));
+        }
+        app.handle_key(KeyEvent::from(KeyCode::Enter));
+        assert!(!dir.path().join("demo").exists());
     }
 }
