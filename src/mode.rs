@@ -11,6 +11,7 @@ pub enum Focus {
     Sidebar,
     UrlBar,
     Auth,
+    Body,
     Response,
 }
 

@@ -6,6 +6,7 @@ pub enum Action {
     SendRequest,
     ToggleFocus,
     ToggleFocusBack,
+    MethodCycle,
     TreeDown,
     TreeUp,
     TreeCollapse,

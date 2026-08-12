@@ -23,6 +23,7 @@ pub fn resolve(mode: Mode, focus: Focus, key: KeyEvent) -> Option<Action> {
     match focus {
         Focus::UrlBar => match key.code {
             KeyCode::Char('i') => Some(Action::EnterInsert),
+            KeyCode::Char('m') => Some(Action::MethodCycle),
             KeyCode::Enter => Some(Action::SendRequest),
             _ => None,
         },
@@ -41,6 +42,10 @@ pub fn resolve(mode: Mode, focus: Focus, key: KeyEvent) -> Option<Action> {
             KeyCode::Char('l') | KeyCode::Right => Some(Action::TreeExpand),
             KeyCode::Char('G') => Some(Action::JumpBottom),
             KeyCode::Enter => Some(Action::TreeOpen),
+            _ => None,
+        },
+        Focus::Body => match key.code {
+            KeyCode::Char('i') => Some(Action::EnterInsert),
             _ => None,
         },
         Focus::Response => match key.code {

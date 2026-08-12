@@ -49,3 +49,10 @@ pub fn build_tree(root: &Path) -> io::Result<Vec<CollectionNode>> {
     folders.extend(files);
     Ok(folders)
 }
+
+/// Creates a new, empty collection directory. Folder nesting is the
+/// collection hierarchy (see [`build_tree`]), so this is nothing more than
+/// making the directory — no manifest file to write.
+pub fn create_collection(path: &Path) -> io::Result<()> {
+    fs::create_dir_all(path)
+}

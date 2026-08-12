@@ -1,4 +1,5 @@
 mod auth_editor;
+mod body_editor;
 mod format;
 mod request_editor;
 mod response_viewer;
@@ -20,11 +21,17 @@ pub fn draw(app: &mut App, frame: &mut Frame) {
 
     sidebar::render(app, frame, main[0]);
 
-    let content =
-        Layout::vertical([Constraint::Length(3), Constraint::Length(3), Constraint::Min(0)]).split(main[1]);
+    let content = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Length(3),
+        Constraint::Length(8),
+        Constraint::Min(0),
+    ])
+    .split(main[1]);
     request_editor::render(app, frame, content[0]);
     auth_editor::render(app, frame, content[1]);
-    response_viewer::render(app, frame, content[2]);
+    body_editor::render(app, frame, content[2]);
+    response_viewer::render(app, frame, content[3]);
 
     status_bar::render(app, frame, outer[1]);
 }

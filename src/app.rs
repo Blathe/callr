@@ -6,6 +6,7 @@ use crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
 use tokio::sync::mpsc::UnboundedSender;
 use tui_input::backend::crossterm::EventHandler;
 use tui_input::Input;
+use tui_textarea::TextArea;
 use tui_tree_widget::{TreeItem, TreeState};
 
 use crate::action::Action;
@@ -52,6 +53,7 @@ pub struct App {
     pub auth_apikey_name: Input,
     pub auth_apikey_value: Input,
     pub auth_apikey_location: ApiKeyLocation,
+    pub body_editor: TextArea<'static>,
     pub history_entries: Vec<HistoryEntry>,
     pub history_selected: usize,
     pub response_tree_state: TreeState<usize>,
@@ -95,6 +97,7 @@ impl App {
             auth_apikey_name: Input::default(),
             auth_apikey_value: Input::default(),
             auth_apikey_location: ApiKeyLocation::Header,
+            body_editor: TextArea::default(),
             history_entries: Vec::new(),
             history_selected: 0,
             response_tree_state: TreeState::default(),
@@ -150,6 +153,9 @@ impl App {
                 self.mode = Mode::Normal;
                 self.send_request();
             }
+            _ if self.focus == Focus::Body => {
+                self.body_editor.input(key);
+            }
             _ => {
                 if let Some(input) = self.active_text_input() {
                     input.handle_event(&CtEvent::Key(key));
@@ -171,7 +177,7 @@ impl App {
                 (AuthKind::ApiKey, 1) => Some(&mut self.auth_apikey_value),
                 _ => None,
             },
-            Focus::Sidebar | Focus::Response => None,
+            Focus::Sidebar | Focus::Body | Focus::Response => None,
         }
     }
 
@@ -222,6 +228,7 @@ impl App {
             "q" | "quit" => self.should_quit = true,
             "w" | "write" => self.save_current(),
             "new" => self.new_request(rest),
+            "mkdir" => self.new_collection(rest),
             "history" => self.show_history(),
             "find" => self.search_history(rest),
             "env" => {
@@ -244,6 +251,7 @@ impl App {
             Action::SendRequest => self.send_request(),
             Action::ToggleFocus => self.toggle_focus(),
             Action::ToggleFocusBack => self.toggle_focus_back(),
+            Action::MethodCycle => self.cycle_method(),
             Action::TreeDown => match self.focus {
                 Focus::Response => {
                     self.response_tree_state.key_down();
@@ -293,7 +301,7 @@ impl App {
                 Focus::Response => {
                     self.response_tree_state.select(vec![0]);
                 }
-                Focus::UrlBar | Focus::Auth => {}
+                Focus::UrlBar | Focus::Auth | Focus::Body => {}
             },
             Action::JumpBottom => match self.focus {
                 Focus::Sidebar => match self.sidebar_view {
@@ -311,7 +319,7 @@ impl App {
                         self.response_tree_state.key_down();
                     }
                 }
-                Focus::UrlBar | Focus::Auth => {}
+                Focus::UrlBar | Focus::Auth | Focus::Body => {}
             },
             Action::AuthCycleKind => {
                 self.auth_kind = self.auth_kind.next();
@@ -339,7 +347,8 @@ impl App {
         self.focus = match self.focus {
             Focus::Sidebar => Focus::UrlBar,
             Focus::UrlBar => Focus::Auth,
-            Focus::Auth => Focus::Response,
+            Focus::Auth => Focus::Body,
+            Focus::Body => Focus::Response,
             Focus::Response => Focus::Sidebar,
         };
     }
@@ -348,9 +357,15 @@ impl App {
         self.focus = match self.focus {
             Focus::UrlBar => Focus::Sidebar,
             Focus::Auth => Focus::UrlBar,
-            Focus::Response => Focus::Auth,
+            Focus::Body => Focus::Auth,
+            Focus::Response => Focus::Body,
             Focus::Sidebar => Focus::Response,
         };
+    }
+
+    fn cycle_method(&mut self) {
+        let request = self.current_request.get_or_insert_with(RequestFile::scratch);
+        request.method = next_method(&request.method);
     }
 
     fn move_selection(&mut self, delta: i32) {
@@ -413,8 +428,31 @@ impl App {
     fn open_request(&mut self, path: Option<PathBuf>, request: RequestFile) {
         self.url_input = Input::new(request.url.clone());
         self.load_auth_fields(&request.auth);
+        self.load_body_editor(&request.body);
         self.current_request = Some(request);
         self.current_path = path;
+    }
+
+    fn load_body_editor(&mut self, body: &BodyKind) {
+        let lines = match body {
+            BodyKind::Raw { content, .. } if !content.is_empty() => {
+                content.lines().map(str::to_string).collect()
+            }
+            _ => vec![String::new()],
+        };
+        self.body_editor = TextArea::new(lines);
+    }
+
+    fn build_body(&self) -> BodyKind {
+        let content = self.body_editor.lines().join("\n");
+        if content.trim().is_empty() {
+            return BodyKind::None;
+        }
+        let content_type = match self.current_request.as_ref().map(|r| &r.body) {
+            Some(BodyKind::Raw { content_type, .. }) => content_type.clone(),
+            _ => "application/json".to_string(),
+        };
+        BodyKind::Raw { content_type, content }
     }
 
     fn load_auth_fields(&mut self, auth: &AuthConfig) {
@@ -487,6 +525,7 @@ impl App {
         let mut request = self.current_request.clone().unwrap_or_else(RequestFile::scratch);
         request.url = self.url_input.value().to_string();
         request.auth = self.build_auth_config();
+        request.body = self.build_body();
         match storage::request_file::save_request(&path, &request) {
             Ok(()) => {
                 self.current_request = Some(request);
@@ -517,6 +556,26 @@ impl App {
                 self.mode = Mode::Insert;
             }
             Err(err) => self.status_message = Some(format!("Failed to create request: {err}")),
+        }
+    }
+
+    fn new_collection(&mut self, name: &str) {
+        if name.is_empty() {
+            self.status_message = Some("Usage: :mkdir <name>".to_string());
+            return;
+        }
+        let dir = self.selected_dir();
+        let path = dir.join(slugify(name));
+        if path.exists() {
+            self.status_message = Some(format!("{} already exists", path.display()));
+            return;
+        }
+        match storage::fs_tree::create_collection(&path) {
+            Ok(()) => {
+                self.refresh_tree();
+                self.status_message = Some(format!("Created {}", path.display()));
+            }
+            Err(err) => self.status_message = Some(format!("Failed to create collection: {err}")),
         }
     }
 
@@ -597,6 +656,7 @@ impl App {
         let mut request = self.current_request.clone().unwrap_or_else(RequestFile::scratch);
         request.url = self.url_input.value().trim().to_string();
         request.auth = self.build_auth_config();
+        request.body = self.build_body();
         if request.url.is_empty() {
             return;
         }
@@ -821,6 +881,18 @@ fn parse_method(raw: &str) -> Method {
     }
 }
 
+fn next_method(current: &Method) -> Method {
+    match current {
+        Method::Get => Method::Post,
+        Method::Post => Method::Put,
+        Method::Put => Method::Patch,
+        Method::Patch => Method::Delete,
+        Method::Delete => Method::Head,
+        Method::Head => Method::Options,
+        Method::Options | Method::Custom(_) => Method::Get,
+    }
+}
+
 fn slugify(name: &str) -> String {
     let mut slug: String = name
         .trim()
@@ -917,5 +989,108 @@ mod tests {
         });
 
         assert!(app.search_matches.is_empty(), "a fresh response should drop the previous search");
+    }
+
+    #[test]
+    fn method_cycle_advances_through_the_common_verbs_and_wraps() {
+        let (mut app, _dir) = test_app();
+
+        app.dispatch(Action::MethodCycle);
+        assert_eq!(app.current_request.as_ref().unwrap().method, Method::Post);
+        app.dispatch(Action::MethodCycle);
+        assert_eq!(app.current_request.as_ref().unwrap().method, Method::Put);
+        app.dispatch(Action::MethodCycle);
+        app.dispatch(Action::MethodCycle);
+        app.dispatch(Action::MethodCycle);
+        app.dispatch(Action::MethodCycle);
+        assert_eq!(app.current_request.as_ref().unwrap().method, Method::Options);
+        app.dispatch(Action::MethodCycle);
+        assert_eq!(app.current_request.as_ref().unwrap().method, Method::Get, "should wrap back to GET");
+    }
+
+    #[test]
+    fn build_body_is_none_when_the_editor_is_empty() {
+        let (app, _dir) = test_app();
+        assert!(matches!(app.build_body(), BodyKind::None));
+    }
+
+    #[test]
+    fn build_body_defaults_new_content_to_json() {
+        let (mut app, _dir) = test_app();
+        app.body_editor = TextArea::new(vec![r#"{"a":1}"#.to_string()]);
+
+        match app.build_body() {
+            BodyKind::Raw { content_type, content } => {
+                assert_eq!(content_type, "application/json");
+                assert_eq!(content, r#"{"a":1}"#);
+            }
+            other => panic!("expected a raw body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_body_preserves_an_existing_content_type() {
+        let (mut app, _dir) = test_app();
+        app.current_request = Some(RequestFile::scratch());
+        app.current_request.as_mut().unwrap().body = BodyKind::Raw {
+            content_type: "text/plain".to_string(),
+            content: "old".to_string(),
+        };
+        app.body_editor = TextArea::new(vec!["new body".to_string()]);
+
+        match app.build_body() {
+            BodyKind::Raw { content_type, .. } => assert_eq!(content_type, "text/plain"),
+            other => panic!("expected a raw body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn new_collection_creates_an_empty_directory_and_refuses_to_overwrite() {
+        let (mut app, dir) = test_app();
+
+        app.new_collection("My Folder");
+        let created = dir.path().join("my_folder");
+        assert!(created.is_dir());
+        assert!(app.status_message.as_deref().unwrap_or_default().contains("Created"));
+
+        app.new_collection("My Folder");
+        assert!(app.status_message.as_deref().unwrap_or_default().contains("already exists"));
+    }
+
+    #[test]
+    fn handle_key_drives_method_cycle_body_edit_and_mkdir_end_to_end() {
+        let (mut app, dir) = test_app();
+
+        // URL bar 'm' cycles the method through the real key-dispatch path.
+        app.focus = Focus::UrlBar;
+        app.handle_key(KeyEvent::from(KeyCode::Char('m')));
+        assert_eq!(app.current_request.as_ref().unwrap().method, Method::Post);
+
+        // Tab cycles focus into the new Body pane; typing there edits the body.
+        app.handle_key(KeyEvent::from(KeyCode::Tab));
+        app.handle_key(KeyEvent::from(KeyCode::Tab));
+        assert_eq!(app.focus, Focus::Body);
+        app.handle_key(KeyEvent::from(KeyCode::Char('i')));
+        assert_eq!(app.mode, Mode::Insert);
+        for ch in "hello".chars() {
+            app.handle_key(KeyEvent::from(KeyCode::Char(ch)));
+        }
+        app.handle_key(KeyEvent::from(KeyCode::Esc));
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(app.body_editor.lines().to_vec(), vec!["hello".to_string()]);
+
+        // Shift+Tab cycles focus back a pane.
+        app.handle_key(KeyEvent::from(KeyCode::BackTab));
+        assert_eq!(app.focus, Focus::Auth);
+
+        // `:mkdir demo` creates a real folder via the command pipeline.
+        app.focus = Focus::Sidebar;
+        app.handle_key(KeyEvent::from(KeyCode::Char(':')));
+        assert_eq!(app.mode, Mode::Command);
+        for ch in "mkdir demo".chars() {
+            app.handle_key(KeyEvent::from(KeyCode::Char(ch)));
+        }
+        app.handle_key(KeyEvent::from(KeyCode::Enter));
+        assert!(dir.path().join("demo").is_dir());
     }
 }
