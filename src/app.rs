@@ -243,6 +243,7 @@ impl App {
             Action::EnterCommand => self.mode = Mode::Command,
             Action::SendRequest => self.send_request(),
             Action::ToggleFocus => self.toggle_focus(),
+            Action::ToggleFocusBack => self.toggle_focus_back(),
             Action::TreeDown => match self.focus {
                 Focus::Response => {
                     self.response_tree_state.key_down();
@@ -340,6 +341,15 @@ impl App {
             Focus::UrlBar => Focus::Auth,
             Focus::Auth => Focus::Response,
             Focus::Response => Focus::Sidebar,
+        };
+    }
+
+    fn toggle_focus_back(&mut self) {
+        self.focus = match self.focus {
+            Focus::UrlBar => Focus::Sidebar,
+            Focus::Auth => Focus::UrlBar,
+            Focus::Response => Focus::Auth,
+            Focus::Sidebar => Focus::Response,
         };
     }
 

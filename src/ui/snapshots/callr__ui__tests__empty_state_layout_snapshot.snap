@@ -31,4 +31,4 @@ expression: text
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 └────────────────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘
- NORMAL   j/k: move  gg/G: top/bottom  h/l: collapse/expand  Enter: open  Tab: next pane  :history  :collections  q: qui
+ NORMAL   j/k: move  gg/G: top/bottom  h/l: collapse/expand  Enter: open  Tab/S-Tab: cycle pane  :history  :collections

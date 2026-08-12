@@ -15,6 +15,7 @@ pub fn resolve(mode: Mode, focus: Focus, key: KeyEvent) -> Option<Action> {
     match key.code {
         KeyCode::Char('q') => return Some(Action::Quit),
         KeyCode::Tab => return Some(Action::ToggleFocus),
+        KeyCode::BackTab => return Some(Action::ToggleFocusBack),
         KeyCode::Char(':') => return Some(Action::EnterCommand),
         _ => {}
     }

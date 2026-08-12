@@ -25,16 +25,16 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
             } else {
                 let hint = match app.focus {
                     crate::mode::Focus::Sidebar => {
-                        "  j/k: move  gg/G: top/bottom  h/l: collapse/expand  Enter: open  Tab: next pane  :history  :collections  q: quit"
+                        "  j/k: move  gg/G: top/bottom  h/l: collapse/expand  Enter: open  Tab/S-Tab: cycle pane  :history  :collections  q: quit"
                     }
                     crate::mode::Focus::UrlBar => {
-                        "  i: edit url  Enter: send  Tab: next pane  ':': command  q: quit"
+                        "  i: edit url  Enter: send  Tab/S-Tab: cycle pane  ':': command  q: quit"
                     }
                     crate::mode::Focus::Auth => {
-                        "  a: cycle type  j/k: field  i: edit  l/Enter: toggle in  Tab: next pane  q: quit"
+                        "  a: cycle type  j/k: field  i: edit  l/Enter: toggle in  Tab/S-Tab: cycle pane  q: quit"
                     }
                     crate::mode::Focus::Response => {
-                        "  j/k: move  gg/G: top/bottom  h/l: collapse/expand  /: search  n/N: next/prev match  Tab: next pane  q: quit"
+                        "  j/k: move  gg/G: top/bottom  h/l: collapse/expand  /: search  n/N: next/prev match  Tab/S-Tab: cycle pane  q: quit"
                     }
                 };
                 spans.push(Span::raw(hint));

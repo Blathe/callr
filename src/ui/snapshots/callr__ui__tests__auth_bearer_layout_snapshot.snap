@@ -31,4 +31,4 @@ expression: text
 │                            ││                                                                                        │
 │                            ││                                                                                        │
 └────────────────────────────┘└────────────────────────────────────────────────────────────────────────────────────────┘
- NORMAL   a: cycle type  j/k: field  i: edit  l/Enter: toggle in  Tab: next pane  q: quit
+ NORMAL   a: cycle type  j/k: field  i: edit  l/Enter: toggle in  Tab/S-Tab: cycle pane  q: quit

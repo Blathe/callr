@@ -5,6 +5,7 @@ pub enum Action {
     EnterCommand,
     SendRequest,
     ToggleFocus,
+    ToggleFocusBack,
     TreeDown,
     TreeUp,
     TreeCollapse,
