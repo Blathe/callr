@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use chrono::Utc;
 use crossterm::event::{Event as CtEvent, KeyCode, KeyEvent};
@@ -21,6 +22,11 @@ use crate::model::request::{BodyKind, KeyValue, Method, RequestFile};
 use crate::model::response::ResponseData;
 use crate::storage;
 use crate::ui::widgets::{self, BodyView};
+
+/// How long to wait for a response before giving up. Long enough to
+/// tolerate a slow-but-legitimate endpoint (cold starts, heavy queries),
+/// short enough that a dead connection doesn't hang the app indefinitely.
+pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct App {
     pub mode: Mode,
@@ -97,7 +103,10 @@ impl App {
             search_match_index: 0,
             pending_g: false,
             history_conn,
-            http_client: reqwest::Client::new(),
+            http_client: reqwest::Client::builder()
+                .timeout(REQUEST_TIMEOUT)
+                .build()
+                .expect("failed to build HTTP client"),
             app_tx,
         };
         app.refresh_tree();

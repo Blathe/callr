@@ -34,7 +34,7 @@ async fn send(http_client: &reqwest::Client, request: &RequestFile) -> Result<Re
     let response = client::build_request(http_client, request)
         .send()
         .await
-        .map_err(|e| describe_error(&e))?;
+        .map_err(|e| error_message(&e))?;
 
     let status = response.status();
     let headers = response
@@ -56,6 +56,20 @@ async fn send(http_client: &reqwest::Client, request: &RequestFile) -> Result<Re
         byte_len,
         elapsed: std::time::Duration::default(),
     })
+}
+
+/// Timeouts (`reqwest::Error::is_timeout`) get a message naming the actual
+/// limit instead of whatever wording the underlying `Elapsed`/hyper error
+/// happens to use; everything else falls through to the full source chain.
+fn error_message(err: &reqwest::Error) -> String {
+    if err.is_timeout() {
+        format!(
+            "request timed out after {}s with no response",
+            crate::app::REQUEST_TIMEOUT.as_secs()
+        )
+    } else {
+        describe_error(err)
+    }
 }
 
 /// `reqwest::Error`'s `Display` only shows its own top-level message (e.g.
@@ -125,5 +139,19 @@ mod tests {
             source: None,
         };
         assert_eq!(describe_error(&err), "just a message");
+    }
+
+    #[tokio::test]
+    #[ignore = "hits the network"]
+    async fn timed_out_request_reports_a_clear_message() {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(1))
+            .build()
+            .unwrap();
+        let mut request = RequestFile::scratch_named("timeout test");
+        request.url = "https://httpbin.org/delay/5".to_string();
+
+        let message = send(&client, &request).await.expect_err("1ms timeout should always fire");
+        assert!(message.contains("timed out"), "expected a timeout message, got: {message}");
     }
 }
