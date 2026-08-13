@@ -1,6 +1,7 @@
 mod auth_editor;
 mod body_editor;
 mod format;
+mod header;
 mod request_editor;
 mod response_viewer;
 mod sidebar;
@@ -15,9 +16,16 @@ use crate::app::App;
 
 pub fn draw(app: &mut App, frame: &mut Frame) {
     let area = frame.area();
-    let outer = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(area);
+    let outer = Layout::vertical([
+        Constraint::Length(header::HEIGHT),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ])
+    .split(area);
 
-    let main = Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)]).split(outer[0]);
+    header::render(frame, outer[0]);
+
+    let main = Layout::horizontal([Constraint::Percentage(25), Constraint::Percentage(75)]).split(outer[1]);
 
     sidebar::render(app, frame, main[0]);
 
@@ -33,7 +41,7 @@ pub fn draw(app: &mut App, frame: &mut Frame) {
     body_editor::render(app, frame, content[2]);
     response_viewer::render(app, frame, content[3]);
 
-    status_bar::render(app, frame, outer[1]);
+    status_bar::render(app, frame, outer[2]);
 }
 
 #[cfg(test)]
